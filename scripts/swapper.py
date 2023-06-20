@@ -46,7 +46,8 @@ def cosine_distance(vector1: np.ndarray, vector2: np.ndarray) -> float:
 
 
 def cosine_similarity(test_vec: np.ndarray, source_vecs: List[np.ndarray]) -> float:
-    cos_dist = sum(cosine_distance(test_vec, source_vec) for source_vec in source_vecs)
+    cos_dist = sum(cosine_distance(test_vec, source_vec)
+                   for source_vec in source_vecs)
     average_cos_dist = cos_dist / len(source_vecs)
     return average_cos_dist
 
@@ -72,7 +73,8 @@ def getFaceSwapModel(model_path: str):
     global CURRENT_FS_MODEL_PATH
     if CURRENT_FS_MODEL_PATH is None or CURRENT_FS_MODEL_PATH != model_path:
         CURRENT_FS_MODEL_PATH = model_path
-        FS_MODEL = insightface.model_zoo.get_model(model_path, providers=providers)
+        FS_MODEL = insightface.model_zoo.get_model(
+            model_path, providers=providers)
 
     return FS_MODEL
 
@@ -96,7 +98,8 @@ def upscale_image(image: Image, upscale_options: UpscaleOptions):
 
     if upscale_options.face_restorer is not None:
         original_image = result_image.copy()
-        logger.info("Restore face with %s", upscale_options.face_restorer.name())
+        logger.info("Restore face with %s",
+                    upscale_options.face_restorer.name())
         numpy_image = np.array(result_image)
         numpy_image = upscale_options.face_restorer.restore(numpy_image)
         restored_image = Image.fromarray(numpy_image)
@@ -105,6 +108,24 @@ def upscale_image(image: Image, upscale_options: UpscaleOptions):
         )
 
     return result_image
+
+
+def get_largest_face(img_data: np.ndarray):
+    face_analyser = copy.deepcopy(getAnalysisModel())
+    face_analyser.prepare(ctx_id=0, det_size=(640, 640))
+    faces = face_analyser.get(img_data)
+
+    if len(faces) == 0:
+        return None
+
+    # Calculate the area of each face
+    face_areas = [((x.bbox[2]-x.bbox[0])*(x.bbox[3]-x.bbox[1])) for x in faces]
+
+    # Find the index of the face with the largest area
+    largest_face_index = face_areas.index(max(face_areas))
+
+    # Return the largest face
+    return faces[largest_face_index]
 
 
 def get_face_single(img_data: np.ndarray, face_index=0, det_size=(640, 640)):
@@ -144,20 +165,22 @@ def swap_face(
     if model is not None:
         source_img = cv2.cvtColor(np.array(source_img), cv2.COLOR_RGB2BGR)
         target_img = cv2.cvtColor(np.array(target_img), cv2.COLOR_RGB2BGR)
-        source_face = get_face_single(source_img, face_index=0)
+        source_face = get_largest_face(source_img)
         if source_face is not None:
             result = target_img
-            model_path = os.path.join(os.path.abspath(os.path.dirname(__file__)), model)
+            model_path = os.path.join(os.path.abspath(
+                os.path.dirname(__file__)), model)
             face_swapper = getFaceSwapModel(model_path)
 
             for face_num in faces_index:
-                target_face = get_face_single(target_img, face_index=face_num)
+                target_face = get_largest_face(target_img)
                 if target_face is not None:
                     result = face_swapper.get(result, target_face, source_face)
                 else:
                     logger.info(f"No target face found for {face_num}")
 
-            result_image = Image.fromarray(cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
+            result_image = Image.fromarray(
+                cv2.cvtColor(result, cv2.COLOR_BGR2RGB))
             if upscale_options is not None:
                 result_image = upscale_image(result_image, upscale_options)
 
