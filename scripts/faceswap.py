@@ -16,6 +16,8 @@ from scripts.swapper import UpscaleOptions, swap_face, ImageResult
 from scripts.cimage import check_batch
 from scripts.roop_version import version_flag
 import os
+import base64
+import io
 
 
 def get_models():
@@ -40,7 +42,8 @@ class FaceSwapScript(scripts.Script):
         with gr.Accordion(f"roop {version_flag}", open=False):
             with gr.Column():
                 img = gr.inputs.Image(type="pil")
-                enable = gr.Checkbox(False, placeholder="enable", label="Enable")
+                enable = gr.Checkbox(
+                    False, placeholder="enable", label="Enable")
                 faces_index = gr.Textbox(
                     value="0",
                     placeholder="Which face to swap (comma separated), start from 0",
@@ -49,7 +52,8 @@ class FaceSwapScript(scripts.Script):
                 with gr.Row():
                     face_restorer_name = gr.Radio(
                         label="Restore Face",
-                        choices=["None"] + [x.name() for x in shared.face_restorers],
+                        choices=["None"] + [x.name()
+                                            for x in shared.face_restorers],
                         value=shared.face_restorers[0].name(),
                         type="value",
                     )
@@ -60,7 +64,8 @@ class FaceSwapScript(scripts.Script):
                     choices=[upscaler.name for upscaler in shared.sd_upscalers],
                     label="Upscaler",
                 )
-                upscaler_scale = gr.Slider(1, 8, 1, step=0.1, label="Upscaler scale")
+                upscaler_scale = gr.Slider(
+                    1, 8, 1, step=0.1, label="Upscaler scale")
                 upscaler_visibility = gr.Slider(
                     0, 1, 1, step=0.1, label="Upscaler visibility (if scale = 1)"
                 )
@@ -145,6 +150,11 @@ class FaceSwapScript(scripts.Script):
         swap_in_source,
         swap_in_generated,
     ):
+        if isinstance(img, str) and img.startswith("data:image"):
+            img_data = img.split(",")[1]
+            bytes_data = base64.b64decode(img_data)
+            img = Image.open(io.BytesIO(bytes_data))
+
         self.source = img
         self.face_restorer_name = face_restorer_name
         self.upscaler_scale = upscaler_scale
@@ -162,7 +172,8 @@ class FaceSwapScript(scripts.Script):
         if self.enable:
             if self.source is not None:
                 if isinstance(p, StableDiffusionProcessingImg2Img) and swap_in_source:
-                    logger.info(f"roop enabled, face index %s", self.faces_index)
+                    logger.info(f"roop enabled, face index %s",
+                                self.faces_index)
 
                     for i in range(len(p.init_images)):
                         logger.info(f"Swap in source %s", i)
